@@ -1,3 +1,5 @@
+## no critic: ValuesAndExpressions::ProhibitCommaSeparatedStatements
+
 package Sys::RunAlone::Flexible;
 
 # DATE
