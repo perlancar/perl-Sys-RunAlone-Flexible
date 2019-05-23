@@ -28,7 +28,7 @@ sub lock {
     # no data handle, we're screwed
     elsif ( tell( *main::DATA ) == -1 ) {
         print STDERR "Add __END__ to end of script '$0'"
-          . " to be able use the features of Sys::RunALone::Flexible\n";
+          . " to be able use the features of Sys::RunAlone::Flexible\n";
         exit 2;
     }
 
