@@ -16,27 +16,49 @@ use Fcntl ':flock';
 my $silent;
 my $retry;
 
+# this holds the package namespace of the calling script
+our $pkg;
+
+# this holds the package namespace of where a tag was found. it will always be
+# main::DATA for __END__, or the namespace of the calling script if __DATA__
+our $data_pkg = 'main::DATA';
+
 sub lock {
     no warnings;
+    no strict 'refs';
+
+    # the environment variables have to be checked here since import doesn't
+    # execute when brought in via "require".
+    # NOTE: the evironment variables will override options that were passed in
+    # via "use" if present!
+    $silent = $ENV{SILENT_SYS_RUNALONE} if exists $ENV{SILENT_SYS_RUNALONE};
+    $retry  = $ENV{RETRY_SYS_RUNALONE} if exists $ENV{RETRY_SYS_RUNALONE};
 
     # skipping
     if ( my $skip= $ENV{SKIP_SYS_RUNALONE} ) {
         print STDERR "Skipping " . __PACKAGE__ . " check for '$0'\n"
           if !$silent and $skip > 1;
+
+        return;
+    }
+    elsif ( tell(*main::DATA) == -1 ) {
+
+        # if we reach this then the __END__ tag does not exist. swap in the
+        # calling script namespace to see if the __DATA__ tag exists.
+        $data_pkg = $pkg . '::DATA';
+        if ( ( tell( *{$data_pkg} ) == -1 ) ) {
+            print STDERR "Add __END__ or __DATA__ to end of script '$0'"
+              . " to be able use the features of Sys::RunALone\n";
+            exit 2;
+        }
     }
 
-    # no data handle, we're screwed
-    elsif ( tell( *main::DATA ) == -1 ) {
-        print STDERR "Add __END__ or __DATA__ to the end of script '$0'"
-          . " to be able use the features of Sys::RunAlone::Flexible\n";
-        exit 2;
-    }
-
-    # we're not alone!
-    elsif ( !flock main::DATA, LOCK_EX | LOCK_NB ) {
+    # are we alone? $data_pkg will be set to wherever an appropriate tag was.
+    if ( !flock *{$data_pkg}, LOCK_EX | LOCK_NB ) {
 
         # need to retry
         if ($retry) {
+            print STDERR "Retrying lock attempt ...\n" unless $silent;
             my ( $times, $sleep )= split ',', $retry;
             $sleep ||= 1;
             while ( $times-- ) {
@@ -45,6 +67,7 @@ sub lock {
                 # we're alone!
                 goto ALLOK if flock main::DATA, LOCK_EX | LOCK_NB;
             }
+            print STDERR "Retrying lock failed ...\n" unless $silent;
         }
 
         # we're done
@@ -53,6 +76,7 @@ sub lock {
     }
 
   ALLOK:
+    return;
 }
 
 #-------------------------------------------------------------------------------
@@ -77,9 +101,7 @@ sub import {
     # obtain parameters
     my %args= @_;
     $silent= delete $args{silent};
-    $silent=  $ENV{SILENT_SYS_RUNALONE} if exists $ENV{SILENT_SYS_RUNALONE};
     $retry=  delete $args{retry};
-    $retry=  $ENV{RETRY_SYS_RUNALONE} if exists $ENV{RETRY_SYS_RUNALONE};
 
     # sanity check
     if ( my @huh= sort keys %args ) {
@@ -90,6 +112,11 @@ sub import {
 } #import
 
 {
+    # it is at this point we can get the correct package namespace of the
+    # calling script
+    my @call_info = caller(0);
+    $pkg = $call_info[0];
+
     # to shut up the 'Too late to run INIT block' warning
     no warnings 'void';
     INIT {
@@ -157,9 +184,13 @@ There are no methods.
 
 =head1 THEORY OF OPERATION
 
-The functionality of this module depends on the availability of the DATA
+The functionality of this module depends on the availability of the C<DATA>
 handle in the script from which this module is called (more specifically:
 in the "main" namespace).
+
+NOTE: the C<__END__> tag is always found in the C<main> package namespace.
+However, the C<__DATA__> tag is always found in the namespace declared by
+the script. This might very well be different when writing a modulino.
 
 At compile/INIT time (or when you run L</lock>), it is checked when there is a
 DATA handle: if not, it exits with an error message on STDERR and an exit value
@@ -262,8 +293,9 @@ L<Sys::RunAlone>.
 =head1 SYS::RUNALONE COPYRIGHT
 
 Copyright (c) 2005, 2006, 2008, 2009, 2011, 2012 Elizabeth Mattijsen
-<liz@dijkmat.nl>.  Copyright (c) 2017 Ben Tilly <btilly@gmail.com>.  All
-rights reserved.  This program is free software; you can redistribute it
-and/or modify it under the same terms as Perl itself.
+<liz@dijkmat.nl>.  Copyright (c) 2017 Ben Tilly <btilly@gmail.com>.
+Copyright (c) 2019 Jim Bacon <boftx@cpan.org>. All rights reserved.
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
 
 =cut

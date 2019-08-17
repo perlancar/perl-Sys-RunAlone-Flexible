@@ -1,3 +1,13 @@
+0.003   2019-08-16  Released-By: BOFTX
+
+    - Added support for __DATA__ tags in package namespaces other than main.
+
+    - Adapted orginal test script for Sys::RunAlone and added new tests
+      for additional functionality.
+
+    - [doc] Added clarification for __DATA__ vs __END__ in different
+       namespaces.
+
 0.002   2019-05-24  Released-By: PERLANCAR
 
 	- No functional changes.
