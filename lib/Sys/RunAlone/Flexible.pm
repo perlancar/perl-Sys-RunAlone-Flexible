@@ -65,7 +65,7 @@ sub lock {
                 sleep $sleep;
 
                 # we're alone!
-                goto ALLOK if flock main::DATA, LOCK_EX | LOCK_NB;
+                goto ALLOK if flock *{$data_pkg}, LOCK_EX | LOCK_NB;
             }
             print STDERR "Retrying lock failed ...\n" unless $silent;
         }
